@@ -1,0 +1,119 @@
+VTSH FAQ
+
+Q) What is vtsh?
+A) It's a basic command interpreter designed for people who are
+   building network appliances on UNIX platforms. It's designed
+   to be a familliar CLI based on industry tradition.
+
+Q) Who wrote vtsh? and what license it is distributed under?
+A) See the header of vtsh.c
+
+Q) Why was this program written?
+A) I have seen a number of projects hinged on using OpenBSD, FreeBSD as the
+   primary OS for things like firewalls, routers, etc. The main issue 
+   facing these projects seems to be usability. People want to see something
+   familiar on the command line instead of requiring OS specific knowledge
+   in order to configure them. This requirement is usually enough to scare
+   people off.
+
+   The goal was to give the designers of these firewall devices a very
+   simple and portable way to add an easy to use familiar CLI to their
+   devices without requiring extensive OS knowledge and programming
+   experience.
+
+Q) How does this differ from nsh or Zebra's vtysh or any of the others?
+A) Modularity:
+   You do not have to modify the vtsh binary in any way shape
+   or form to create new modes, change, add or remove commands, modify
+   context sensitive help etc.
+
+   Portability:
+   The shell is highly portable. All it does it process directory
+   structures. The implementation of the commands themselves are
+   shell scripts.
+
+Q) How does this work?
+A) It's actually very simple. Each mode has a set of commands.
+   I.E.: regular and enabled mode. You can add as many as you want
+   but only one is required:
+
+   $VTSH_ROOT/default
+
+   If you wanted to implement a command called:
+
+      show ip route
+
+   Your directory structure would look like this:
+
+      $VYSH_ROOT/default/show/ip/route/
+
+  This directory needs the following file: activate.sh
+
+      I.E.: $VYSH_ROOT/default/show/ip/route/activate.sh
+
+  Any time the user typed: "show ip route" the activate.sh script would be
+  executed. Upon inspection of this activate.sh script we find:
+
+     % cat $VYSH_ROOT/default/show/ip/route/activate.sh
+     #!/bin/sh
+     #
+     netstat -f inet -rn | more
+     %
+
+  This allows you to keep your command line interface identical across all
+  platforms, the only things you need to modify is the shell scripts and
+  possibly the directory structure.
+
+  If you prefix a command with "no":
+
+     I.E.: no ip route 0.0.0.0 0.0.0.0 1.1.1.1
+
+  The "deactivate.sh" script needs to be present:
+
+    I.E.: $VYSH_ROOT/default/ip/route/deactivate.sh
+
+  Each "mode" or top directory should contain a "prompt" file which contains
+  the prompt for this specific mode:
+
+    % cat $VYSH_ROOT/default/prompt
+    > 
+    % cat $VYSH_ROOT/enabled/prompt
+    # 
+    % cat $VYSH_ROOT/config/prompt
+    (config)# 
+    %
+
+  To "enable" the execution of privileged commands, we might do this:
+
+    % cat $VYSH_ROOT/default/enable/activate.sh
+    #!/bin/sh
+    #
+    su root -c 'vtsh enabled'
+    %
+
+  Which would start vtsh in "enabled" mode and would start processing commands
+  from $VYSH_ROOT/enabled.
+
+Q) How would I implement context sensitive help?
+A) You create a file called "help" and place in into the appropriate directory.
+   For example, the following command:
+
+    show ip ?
+
+  Would read data stored in the following file:
+
+    $VYSH_ROOT/default/show/ip/help
+
+  A simply write it to standard out. (Well it's actually the same as this:)
+
+    less $VYSH_ROOT/default/show/ip/help
+
+Q) Does vtsh handle security?
+A) No, that is the nice thing. It depends on the security capabilities of
+   the Operating System. For instance if you wanted to, you can use POSIX.1e
+   extended ACLs for granular access control on who could access what. Or if
+   you wanted to, you could use the Mandatory Access Control framework for
+   highly sensitive devices.
+
+   vtsh simply processes directory structures and executes files. So it operates
+   in the context of the user which is logged in.
